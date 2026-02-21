@@ -31,6 +31,7 @@ const program = {
       '--warnings', 'all',
       '--fqbn', fqbn,
       '--libraries', socket.libPath,
+      '--build-cache-path', '/mnt/duino-data/build-cache',
       ...(!noHex ? ['--output-dir', `${socket.sketchPath}/output`] : []),
       socket.sketchPath,
     ], socket, { noJson: true });
@@ -141,6 +142,7 @@ const program = {
       'all',
       '--fqbn',
       fqbn,
+      '--build-cache-path', '/mnt/duino-data/build-cache',
       '--output-dir',
       `${session.sketchPath}/legacy`,
       session.sketchPath,

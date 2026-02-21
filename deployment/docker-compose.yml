@@ -25,6 +25,8 @@ services:
     image: duinoapp/duinoapp-server:latest
     container_name: duinoapp
     restart: unless-stopped
+    tmpfs:
+      - /tmp:exec,size=512m
     volumes:
       - duinoapp-lib-downloads:/mnt/duino-data/lib-downloads
     environment: # update these, server info displayed to users

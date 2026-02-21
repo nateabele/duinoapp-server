@@ -23,6 +23,7 @@ module.exports = async (url, file, postAction, path, skipDLIfExists) => {
   if (path) {
     await mkdir(path);
   }
+  let downloaded = false;
   if (!data || !data.mtime || !skipDLIfExists) {
     const res = await axios({
       method: 'get',
@@ -38,11 +39,13 @@ module.exports = async (url, file, postAction, path, skipDLIfExists) => {
       break;
     case 200:
       await fs.writeFile(file, Buffer.from(res.data, 'binary'));
+      downloaded = true;
       break;
     default:
       throw new Error(`Failed to fetch file ${file} (${res.status}) ${res.statusText}`);
     }
   }
+  if (!postAction || (skipDLIfExists && !downloaded)) return;
   switch (postAction) {
   case 'unzip':
     const zip = new Zip(file);

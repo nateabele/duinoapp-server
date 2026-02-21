@@ -41,7 +41,7 @@ echo "       Removing old container..."
 sudo docker rm duinoapp || true
 
 echo "       Starting new container..."
-sudo docker run -d --name duinoapp --restart unless-stopped --network ubuntu_default -p 3030:3030 ${IMAGE_NAME}:${IMAGE_TAG}
+sudo docker run -d --name duinoapp --restart unless-stopped --network ubuntu_default --tmpfs /tmp:exec,size=512m -p 3030:3030 ${IMAGE_NAME}:${IMAGE_TAG}
 
 echo "       Cleaning up old images..."
 sudo docker image prune -f

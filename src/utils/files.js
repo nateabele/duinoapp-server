@@ -3,12 +3,13 @@ const fs = require('fs').promises;
 const path = require('path');
 const tmp = require('tmp-promise');
 const { v3 } = require('uuid');
+const Zip = require('adm-zip');
 const downloadFile = require('./download-file');
 
 const libNS = '404e901a-0521-47f5-8fcf-74f7f7a1dfc9';
 const libDownloadPath = '/mnt/duino-data/lib-downloads';
+const libExtractedPath = '/mnt/duino-data/lib-extracted';
 
-// TODO set up symlink to staging files (downloads)
 const files = {
 
   checkPath: (filepath, socket, sub = '') => {
@@ -58,27 +59,40 @@ const files = {
 
   loadTempLibs: async (libs, socket, done) => {
     const libPath = path.join(socket.tmpDir.path, 'libraries');
+    await fs.mkdir(libPath, { recursive: true });
     const results = await Promise.all(libs.map(async (lib) => {
       const filePath = files.libPath(lib.url);
-      console.log(lib.url, filePath, libPath);
+      const extractId = v3(lib.url, libNS);
+      const extractDir = path.join(libExtractedPath, extractId);
+      console.log(lib.url, filePath, extractDir);
       try {
-        await downloadFile(lib.url, filePath, 'unzip', libPath, true);
-        // Rename versioned folder to library name (e.g., TM1637-1.2.0 -> TM1637)
-        // Arduino CLI expects folder names without version suffixes
-        const entries = await fs.readdir(libPath);
+        // Download ZIP if not already cached (no extraction here)
+        await downloadFile(lib.url, filePath, null, null, true);
+
+        // Extract to persistent cache only if not already extracted
+        let needsExtract = false;
+        try {
+          await fs.access(extractDir);
+        } catch {
+          needsExtract = true;
+        }
+        if (needsExtract) {
+          await fs.mkdir(extractDir, { recursive: true });
+          const zip = new Zip(filePath);
+          zip.extractAllTo(extractDir, true);
+        }
+
+        // Symlink each library subdirectory into the per-compile library path
+        const entries = await fs.readdir(extractDir);
         for (const entry of entries) {
-          // Check if folder matches pattern: LibName-version (e.g., TM1637-1.2.0)
           const versionMatch = entry.match(/^(.+)-\d+\.\d+\.\d+$/);
-          if (versionMatch) {
-            const baseName = versionMatch[1];
-            const oldPath = path.join(libPath, entry);
-            const newPath = path.join(libPath, baseName);
-            // Only rename if target doesn't exist
-            try {
-              await fs.access(newPath);
-            } catch {
-              await fs.rename(oldPath, newPath);
-            }
+          const targetName = versionMatch ? versionMatch[1] : entry;
+          const source = path.join(extractDir, entry);
+          const link = path.join(libPath, targetName);
+          try {
+            await fs.access(link);
+          } catch {
+            await fs.symlink(source, link);
           }
         }
       } catch (err) {

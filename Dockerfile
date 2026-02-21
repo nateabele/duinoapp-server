@@ -3,8 +3,8 @@ FROM node:20-bookworm
 USER root
 RUN useradd duino
 
-RUN mkdir -p /mnt/duino-data
-RUN chmod 0777 /mnt/duino-data
+RUN mkdir -p /mnt/duino-data /mnt/duino-data/build-cache /mnt/duino-data/lib-extracted
+RUN chmod 0777 /mnt/duino-data /mnt/duino-data/build-cache /mnt/duino-data/lib-extracted
 
 RUN apt-get update && apt-get install build-essential python3-pip python3-serial python3-serial -y
 
