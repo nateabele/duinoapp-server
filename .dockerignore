@@ -3,3 +3,4 @@ base-all/data/arduino-downloads
 Arduino
 node_modules
 .env
+data/

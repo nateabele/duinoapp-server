@@ -1,0 +1,67 @@
+# Native compile server, sandboxed. Installed by deploy/install.sh.
+# Check the sandbox score with: systemd-analyze security duino-compile
+[Unit]
+Description=duino.app Arduino compile server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=duino
+Group=duino
+WorkingDirectory=/opt/duino-compile/app
+EnvironmentFile=/etc/duino-compile.env
+Environment=NODE_ENV=production DATA_DIR=/var/lib/duino-compile HOST=127.0.0.1 PORT=3030
+ExecStart=/opt/duino-compile/node/bin/node src/index.js
+Restart=always
+RestartSec=2
+
+# --- Resource limits: a burst of compiles must not take the box down ---
+MemoryHigh=2600M
+MemoryMax=3000M
+MemorySwapMax=0
+TasksMax=512
+CPUWeight=80
+LimitNOFILE=8192
+
+# --- Filesystem: read-only OS, writable data dir only, private /tmp ---
+ProtectSystem=strict
+ReadWritePaths=/var/lib/duino-compile
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectProc=invisible
+ProcSubset=pid
+UMask=0077
+
+# --- Privileges ---
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+AmbientCapabilities=
+RestrictSUIDSGID=yes
+LockPersonality=yes
+RestrictRealtime=yes
+RestrictNamespaces=yes
+PrivateUsers=yes
+RemoveIPC=yes
+
+# --- Kernel and host surfaces ---
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallFilter=~@privileged @mount @swap @reboot @raw-io @obsolete @cpu-emulation @debug
+SystemCallErrorNumber=EPERM
+
+# --- Network: only IPv4/6 + unix sockets. Library downloads need the internet,
+# but nothing internal: no EC2 metadata service (credential theft via a crafted
+# library URL), no VPC/private ranges. Loopback stays open for Caddy -> node.
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+IPAddressDeny=169.254.0.0/16 10.0.0.0/8 172.16.0.0/12 192.168.0.0/16 100.64.0.0/10 fc00::/7 fe80::/10
+
+[Install]
+WantedBy=multi-user.target

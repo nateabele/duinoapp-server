@@ -1,4 +1,5 @@
 const { spawn } = require('child_process');
+const config = require('../config');
 
 module.exports = (commands, args, socket, options) => new Promise((resolve) => {
   const opts = {
@@ -11,16 +12,27 @@ module.exports = (commands, args, socket, options) => new Promise((resolve) => {
     // console.log(data.toString('utf-8'));
     if (opts.emit && socket.emit) socket.emit('console.log', data.toString('utf-8'));
   };
-  let cliArgs = process.env.CLI_ARGS || '--config-file /mnt/duino-data/arduino-cli.yml --format json';
+  let cliArgs = process.env.CLI_ARGS || `--config-file ${config.cliConfigPath} --format json`;
   if (opts.noJson) cliArgs = cliArgs.replace(' --format json', '');
 
-  const exec = spawn('/mnt/duino-data/arduino-cli', [
+  const exec = spawn(config.cliPath, [
     ...(Array.isArray(commands) ? commands : commands.split('.')),
     ...(Array.isArray(args) ? args : [args]).map((arg) => `${`${arg}`.replace(/"/g, '')}`),
     ...(cliArgs).split(' '),
-  ], { cwd: socket ? socket.tmpDir.path : `${__dirname}/../../`, env: { HOME: '/mnt/duino-data', PATH: process.env.PATH } });
+  ], {
+    cwd: socket && socket.tmpDir ? socket.tmpDir.path : `${__dirname}/../../`,
+    env: config.cliEnv(),
+  });
+  const timer = setTimeout(() => {
+    log(`\nError: arduino-cli timed out after ${config.cliTimeout / 1000}s\n`);
+    exec.kill('SIGKILL');
+  }, config.cliTimeout);
   exec.stdout.on('data', (data) => log(data));
   exec.stderr.on('data', (data) => log(data));
 
-  exec.on('close', () => resolve(res));
+  exec.on('error', (err) => log(`\nError: ${err.message}\n`));
+  exec.on('close', () => {
+    clearTimeout(timer);
+    resolve(res);
+  });
 });

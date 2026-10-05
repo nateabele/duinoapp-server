@@ -12,7 +12,13 @@ It's important to note that this server is bundled using docker with **All** the
 this allows anyone to use any library they desire by simply including it. The down side of this is
 that the servers docker-bundle size is several gigabytes in size.
 
-## Installing a local compile server
+## Running without Docker
+
+The server runs natively on macOS or Linux with pinned, checksum-verified
+dependencies, and there's a sandboxed systemd setup for production. See
+[deploy/README.md](deploy/README.md).
+
+## Installing a local compile server (Docker)
 
 **Warning:** The server download is serveral gigabytes in size, initial installation will take a while.
 

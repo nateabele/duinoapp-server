@@ -2,12 +2,15 @@ const fs = require('fs').promises;
 const properties = require('properties');
 const _ = require('lodash');
 const json = require('../src/utils/json');
+const config = require('../src/config');
 
-module.exports = async (supportedCores) => {
+// coreVersions: { 'arduino:avr': '1.8.7', ... } — the cores that were installed.
+module.exports = async (coreVersions) => {
   console.log('Pre-Processing Data');
-  const cores = await json.parse('/mnt/duino-data/cores.json');
-  const libs = await json.parse('/mnt/duino-data/libs.json');
-  const boards = await json.parse('/mnt/duino-data/boards.json');
+  const supportedCores = Object.keys(coreVersions);
+  const cores = await json.parse(config.dataPath('cores.json'));
+  const libs = await json.parse(config.dataPath('libs.json'));
+  const boards = await json.parse(config.dataPath('boards.json'));
 
   const processFile = async (path) => {
     let file = await fs.readFile(path, 'utf8');
@@ -43,12 +46,14 @@ module.exports = async (supportedCores) => {
     ],
   }));
 
-  const processedCores = cores.map(lowerCaseKeys).filter((c) => supportedCores.includes(c.id));
+  const processedCores = cores.map(lowerCaseKeys)
+    .filter((c) => supportedCores.includes(c.id))
+    .map((c) => ({ ...c, installed: coreVersions[c.id] }));
 
   let processedBoards = boards;
   await Promise.all(processedCores.map(async (core) => {
     const [pack, arch] = core.id.split(':');
-    const path = `/mnt/duino-data/.arduino15/packages/${pack}/hardware/${arch}/${core.latest}/boards.txt`;
+    const path = config.dataPath(`.arduino15/packages/${pack}/hardware/${arch}/${core.installed}/boards.txt`);
     let props;
     try {
       props = await processFile(path);
@@ -82,11 +87,11 @@ module.exports = async (supportedCores) => {
       }
     });
 
-  await json.stringify('/mnt/duino-data/cores-processed.json', processedCores);
+  await json.stringify(config.dataPath('cores-processed.json'), processedCores);
   await json.saveLargeData('boards', processedBoards);
   await json.saveLargeData('libs', processedLibs);
   await json.saveDataAsJSONL('boards', processedBoards);
   await json.saveDataAsJSONL('libs', processedLibs);
-  await json.stringify('/mnt/duino-data/legacy-boards-processed.json', legacyBoards);
+  await json.stringify(config.dataPath('legacy-boards-processed.json'), legacyBoards);
   console.log('Done Pre-Processing Data');
 };

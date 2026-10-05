@@ -4,9 +4,10 @@ const path = require('path');
 const tmp = require('tmp-promise');
 const { v3 } = require('uuid');
 const downloadFile = require('./download-file');
+const config = require('../config');
 
 const libNS = '404e901a-0521-47f5-8fcf-74f7f7a1dfc9';
-const libDownloadPath = '/mnt/duino-data/lib-downloads';
+const { libDownloadPath } = config;
 
 // TODO set up symlink to staging files (downloads)
 const files = {
@@ -54,14 +55,30 @@ const files = {
     if (done) done();
   },
 
-  libPath: (url) => path.join(libDownloadPath, `${v3(url, libNS)}.zip`),
+  // Library zips come from client-supplied URLs; only fetch from known hosts.
+  checkLibUrl: (url) => {
+    let parsed;
+    try {
+      parsed = new URL(url);
+    } catch (err) {
+      throw new Error(`Invalid library URL "${url}"`);
+    }
+    if (parsed.protocol !== 'https:' || !config.libAllowedHosts.includes(parsed.hostname)) {
+      throw new Error(`Library URL host "${parsed.hostname}" is not allowed (allowed: ${config.libAllowedHosts.join(', ')})`);
+    }
+  },
+
+  libPath: (url) => {
+    files.checkLibUrl(url);
+    return path.join(libDownloadPath, `${v3(url, libNS)}.zip`);
+  },
 
   loadTempLibs: async (libs, socket, done) => {
     const libPath = path.join(socket.tmpDir.path, 'libraries');
     const results = await Promise.all(libs.map(async (lib) => {
-      const filePath = files.libPath(lib.url);
-      console.log(lib.url, filePath, libPath);
       try {
+        const filePath = files.libPath(lib.url);
+        console.log(lib.url, filePath, libPath);
         await downloadFile(lib.url, filePath, 'unzip', libPath, true);
         // Rename versioned folder to library name (e.g., TM1637-1.2.0 -> TM1637)
         // Arduino CLI expects folder names without version suffixes

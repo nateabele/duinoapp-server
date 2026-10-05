@@ -28,7 +28,8 @@ module.exports = async (url, file, postAction, path, skipDLIfExists) => {
       method: 'get',
       url,
       responseType: 'arraybuffer',
-      timeout: 10 * 1000,
+      timeout: 30 * 1000,
+      maxContentLength: 100 * 1024 * 1024,
       headers: data && data.mtime ? {
         'If-Modified-Since': data.mtime,
       } : undefined,

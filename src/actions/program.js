@@ -4,6 +4,10 @@ const net = require('net');
 const cli = require('../utils/arduino-exec');
 const tmpFiles = require('../utils/files');
 const json = require('../utils/json');
+const config = require('../config');
+const limit = require('../utils/limit');
+
+const compileSlot = limit({ max: config.maxConcurrentCompiles, queueTimeout: config.compileQueueTimeout });
 
 
 const program = {
@@ -21,9 +25,24 @@ const program = {
     return {};
   },
 
-  compile: async ({
+  compileStats: () => compileSlot.stats(),
+
+  // Never leave a caller hanging: any failure becomes an error response.
+  compile: async (opts, socket, done) => {
+    let response;
+    try {
+      response = await compileSlot(() => program.compileUnsafe(opts, socket));
+    } catch (err) {
+      console.error(err);
+      response = { error: { Cause: err.message, Message: err.message }, log: err.message };
+    }
+    if (done) done(response);
+    return response;
+  },
+
+  compileUnsafe: async ({
     fqbn, files, noHex = false, flags = {}, libs = [],
-  }, socket, done) => {
+  }, socket) => {
     await tmpFiles.loadTempFiles(files, socket);
     const libRes = await tmpFiles.loadTempLibs(libs, socket);
     const res = await cli('compile', [
@@ -66,8 +85,9 @@ const program = {
             || (board.config_options.find((o) => o.option === 'FlashMode')
               || { values: [{ selected: true, value: '' }] }).values.find((v) => v.selected).value
             || board.properties.build.boot;
-          const [version] = await fs.readdir('/mnt/duino-data/.arduino15/packages/esp32/hardware/esp32/');
-          const espToolsPath = `/mnt/duino-data/.arduino15/packages/esp32/hardware/esp32/${version}/tools`;
+          const esp32Path = config.dataPath('.arduino15/packages/esp32/hardware/esp32');
+          const [version] = await fs.readdir(esp32Path);
+          const espToolsPath = `${esp32Path}/${version}/tools`;
           try {
             const appBin = await fs.readFile(`${socket.sketchPath}/output/${ref}.ino.bin`, 'base64');
             const partBin = await fs.readFile(`${socket.sketchPath}/output/${ref}.ino.partitions.bin`, 'base64');
@@ -91,7 +111,6 @@ const program = {
     // strip the sketch path from the log
     response.log = response.log.replaceAll(socket.sketchPath, '');
     // tmpFiles.cleanup(socket);
-    if (done) done(response);
     return response;
   },
 
@@ -131,7 +150,9 @@ const program = {
     return response;
   },
 
-  legacyCompile: async ({ fqbn, content }) => {
+  legacyCompile: (opts) => compileSlot(() => program.legacyCompileUnsafe(opts)),
+
+  legacyCompileUnsafe: async ({ fqbn, content }) => {
     const session = {};
     const files = [{ name: 'legacy/legacy.ino', content }];
     await tmpFiles.loadTempFiles(files, session);

@@ -4,9 +4,11 @@
   "description": "",
   "main": "src/index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node src/index.js",
+    "setup": "node setup/install.js",
     "build-base": "docker build --rm -f \"base.Dockerfile\" -t duino-docker-base:latest .",
-    "build": "docker build --rm -f \"Dockerfile\" -t duino-docker:latest ."
+    "build": "docker build --rm -f \"Dockerfile\" -t duino-docker:latest .",
+    "test": "node --test test/*.test.js"
   },
   "author": "Fraser Bullock",
   "license": "GPL-3.0",
@@ -34,5 +36,8 @@
     "eslint-plugin-import": "^2.18.2",
     "serverless": "^2.31.0",
     "serverless-iam-roles-per-function": "^3.1.0"
+  },
+  "engines": {
+    "node": ">=20"
   }
 }

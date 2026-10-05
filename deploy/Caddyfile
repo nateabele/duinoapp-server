@@ -1,0 +1,19 @@
+# TLS terminator for the compile server. Caddy gets and renews the
+# Let's Encrypt certificate itself (HTTP-01 on port 80); no DNS API token needed.
+{$DUINO_HOSTNAME} {
+	encode gzip
+	request_body {
+		max_size 10MB
+	}
+	reverse_proxy 127.0.0.1:3030 {
+		transport http {
+			response_header_timeout 180s
+		}
+	}
+	log {
+		output file /var/log/caddy/duino-compile.log {
+			roll_size 20MiB
+			roll_keep 5
+		}
+	}
+}

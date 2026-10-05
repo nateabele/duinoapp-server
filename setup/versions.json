@@ -1,0 +1,20 @@
+{
+  "arduinoCli": {
+    "version": "0.35.3",
+    "assets": {
+      "linux-x64": { "file": "arduino-cli_0.35.3_Linux_64bit.tar.gz", "sha256": "acf3a3e03f0478a1cade44d23d4bc2f979c9b61b64e13bc66e26220b7b9fbd23" },
+      "linux-arm64": { "file": "arduino-cli_0.35.3_Linux_ARM64.tar.gz", "sha256": "cd9836feb5944dca34f628753b77e36fb7a430306efb2b908460c82bfacee8fa" },
+      "darwin-x64": { "file": "arduino-cli_0.35.3_macOS_64bit.tar.gz", "sha256": "143b62e44e4bc3f8c87f7539683ca6ec14684aa0399e001d0ee69d09b9effae8" },
+      "darwin-arm64": { "file": "arduino-cli_0.35.3_macOS_ARM64.tar.gz", "sha256": "f2f029d86fd6ae4c1aa9a0c0555147733e2132263bb6b34376acbc956cff9d95" }
+    }
+  },
+  "cores": {
+    "arduino:avr": "1.8.7",
+    "esp8266:esp8266": "3.1.2",
+    "esp32:esp32": "3.3.6"
+  },
+  "boardManagerUrls": [
+    "https://arduino.esp8266.com/stable/package_esp8266com_index.json",
+    "https://raw.githubusercontent.com/espressif/arduino-esp32/gh-pages/package_esp32_index.json"
+  ]
+}

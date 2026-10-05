@@ -1,6 +1,7 @@
 const fs = require('fs');
 const { Type } = require('js-binary');
 const _ = require('lodash');
+const config = require('../config');
 
 const parseCache = {};
 
@@ -89,7 +90,7 @@ const getProps = (type) => {
   switch (type) {
   case 'libs':
     return {
-      file: '/mnt/duino-data/libs-processed.jsbin',
+      file: config.dataPath('libs-processed.jsbin'),
       schema: libSchema,
       keepFields: [
         'name', 'author', 'version', 'maintainer', 'sentence',
@@ -99,7 +100,7 @@ const getProps = (type) => {
     };
   case 'boards':
     return {
-      file: '/mnt/duino-data/boards-processed.jsbin',
+      file: config.dataPath('boards-processed.jsbin'),
       schema: boardSchema,
       keepFields: [
         'fqbn', 'name', 'version', 'properties_id', 'package',

@@ -4,3 +4,5 @@ base-all/data/arduino/staging
 Arduino
 sls-config.yml
 .serverless
+data/
+*.log

@@ -1,35 +1,26 @@
-FROM node:20-bookworm
+FROM node:24.21.0-bookworm-slim
 
-USER root
-RUN useradd duino
+# Native installs are the primary deployment (see deploy/README.md); this image
+# is kept for anyone who still wants a container. Same pinned setup either way.
+ENV DATA_DIR=/mnt/duino-data \
+    HOST=0.0.0.0 \
+    PORT=3030
 
-RUN mkdir -p /mnt/duino-data
-RUN chmod 0777 /mnt/duino-data
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends ca-certificates python3 python3-serial \
+  && rm -rf /var/lib/apt/lists/* \
+  && useradd --create-home duino \
+  && mkdir -p /mnt/duino-data && chown duino:duino /mnt/duino-data
 
-RUN apt-get update && apt-get install build-essential python3-pip python3-serial python3-serial -y
-
-# RUN pip install pyserial
-
-# clean up apt
-RUN apt-get clean
-RUN rm -rf /var/lib/apt/lists/*
-
-COPY setup /home/duino/setup
-COPY src/utils /home/duino/src/utils
-# COPY Arduino /home/duino/Arduino
-# RUN mkdir /home/duino
-RUN chmod +x /home/duino/setup/*.sh
-RUN chown duino:duino /home/duino -R
-
-WORKDIR /home/duino
+WORKDIR /home/duino/app
+COPY --chown=duino:duino package*.json ./
 USER duino
+RUN npm ci --omit=dev
 
-COPY package*.json /home/duino/
-RUN npm ci
-
-RUN node ./setup/docker-install.js
-
-COPY src /home/duino/src
+COPY --chown=duino:duino setup ./setup
+COPY --chown=duino:duino src ./src
+ARG CORES
+RUN CORES=$CORES npm run setup
 
 EXPOSE 3030
 CMD [ "node", "src/index.js" ]

@@ -1,9 +1,10 @@
 const json = require('../utils/json');
+const config = require('../config');
 
-const loadCores = () => json.parse('/mnt/duino-data/cores-processed.json');
+const loadCores = () => json.parse(config.dataPath('cores-processed.json'));
 const loadLibs = () => json.loadLargeData('libs');
 const loadBoards = () => json.loadLargeData('boards');
-const loadLegacyBoards = () => json.parse('/mnt/duino-data/legacy-boards-processed.json');
+const loadLegacyBoards = () => json.parse(config.dataPath('legacy-boards-processed.json'));
 
 const searchRegex = (search = '') => new RegExp(`(${search.replace(/[^\w-\s]/g, '.').split(/\s+/g).join(')|(')})`, 'i');
 const exactSearchRegex = (search = '') => new RegExp(`^${search.replace(/[^\w-\s]/g, '.?')}$`, 'i');
@@ -18,7 +19,9 @@ module.exports.server = (socket, done) => done && done({
 });
 
 
-module.exports.librariesSearch = async (data, socket, done) => {
+module.exports.librariesSearch = async (data = {}, socket, done) => {
+  // eslint-disable-next-line no-param-reassign
+  data = { ...data, search: `${data.search || ''}` };
   const libs = await loadLibs();
   const limit = Math.min(Math.max(data.limit || 10, 1), 100);
   const skip = Math.max(data.skip || 0, 0);
