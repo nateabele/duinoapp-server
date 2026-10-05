@@ -106,7 +106,10 @@ const loadBoards = async () => {
   await _.chunk(response.boards, 10).reduce(async (a, boardChunk, i) => {
     await a;
     await Promise.all(boardChunk.map(async (board) => {
-      const details = JSON.parse(await cli('board.details', ['-b', board.fqbn, '--full']));
+      // Some third-party boards ship broken definitions; skip them like before.
+      const details = await cli('board.details', ['-b', board.fqbn, '--full'])
+        .then(JSON.parse)
+        .catch((err) => ({ error: err.message.split('\n').slice(1).join(' ').trim() }));
       if (!details.name) {
         console.log('Skipping', board.fqbn, details);
         return;
