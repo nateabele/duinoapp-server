@@ -73,8 +73,9 @@ install -m 0644 "$REPO_DIR/deploy/duino-compile.service" /etc/systemd/system/dui
 systemctl daemon-reload
 systemctl enable duino-compile >/dev/null
 systemctl restart duino-compile
-for _ in $(seq 1 30); do curl -fs http://127.0.0.1:3030/healthz >/dev/null && break; sleep 1; done
-curl -fsS http://127.0.0.1:3030/healthz && echo
+PORT="$(sed -n 's/^PORT=//p' "$ENV_FILE" | tail -1)"; PORT="${PORT:-3030}"
+for _ in $(seq 1 30); do curl -fs "http://127.0.0.1:$PORT/healthz" >/dev/null && break; sleep 1; done
+curl -fsS "http://127.0.0.1:$PORT/healthz" && echo
 
 log "Caddy $CADDY_VERSION (TLS for $HOSTNAME_ARG)"
 if ! dpkg -s caddy 2>/dev/null | grep -q "^Version: $CADDY_VERSION"; then
