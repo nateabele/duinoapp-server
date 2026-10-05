@@ -36,9 +36,11 @@ case "$(uname -m)" in
 esac
 
 log() { printf '\n==> %s\n' "$*"; }
+# Ubuntu mirrors are briefly inconsistent while syncing; retry before giving up.
+apt_update() { for _ in 1 2 3; do apt-get update -qq && return; sleep 15; done; apt-get update -qq; }
 
 log "System packages"
-apt-get update -qq
+apt_update
 apt-get install -y -qq ca-certificates curl gnupg rsync xz-utils python3 python3-serial >/dev/null
 
 log "Service user"
@@ -82,7 +84,7 @@ log "Caddy $CADDY_VERSION (TLS for $HOSTNAME_ARG)"
 if ! dpkg -s caddy 2>/dev/null | grep -q "^Version: $CADDY_VERSION"; then
   curl -fsSL https://dl.cloudsmith.io/public/caddy/stable/gpg.key | gpg --dearmor --yes -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
   curl -fsSL https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt > /etc/apt/sources.list.d/caddy-stable.list
-  apt-get update -qq
+  apt_update
   apt-mark unhold caddy >/dev/null 2>&1 || true
   # Don't let the package auto-start Caddy before we decide (80/443 may be taken).
   printf '#!/bin/sh\nexit 101\n' > /usr/sbin/policy-rc.d && chmod +x /usr/sbin/policy-rc.d
