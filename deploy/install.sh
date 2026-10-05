@@ -11,6 +11,7 @@
 #   CORES=arduino:avr   install only these cores (default: all pinned in setup/versions.json)
 #   SKIP_PROXY=1        install Caddy but leave it stopped (e.g. while another proxy holds 80/443)
 set -euo pipefail
+export DEBIAN_FRONTEND=noninteractive
 
 HOSTNAME_ARG="${1:?usage: install.sh <public hostname>}"
 REPO_DIR="$(cd "$(dirname "$0")/.." && pwd)"
@@ -90,8 +91,11 @@ if ! dpkg -s caddy 2>/dev/null | grep -q "^Version: $CADDY_VERSION"; then
   apt-mark hold caddy >/dev/null
 fi
 install -d -o caddy -g caddy /var/log/caddy
+install -D -m 0644 "$REPO_DIR/deploy/caddy-hardening.conf" /etc/systemd/system/caddy.service.d/hardening.conf
+systemctl daemon-reload
 sed "s/{\$DUINO_HOSTNAME}/$HOSTNAME_ARG/" "$REPO_DIR/deploy/Caddyfile" > /etc/caddy/Caddyfile
-caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile >/dev/null
+caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile >/dev/null 2>&1 \
+  || caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
 
 if [ "${SKIP_PROXY:-}" = 1 ]; then
   systemctl disable --now caddy >/dev/null 2>&1 || true

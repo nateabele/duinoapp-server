@@ -62,4 +62,7 @@ client chooses, so it runs with:
   caps simultaneous compiles (`MAX_CONCURRENT_COMPILES`, default = CPU count)
   and queues the rest.
 
-`systemd-analyze security duino-compile` scores the result.
+Caddy gets a matching drop-in (`deploy/caddy-hardening.conf`): it can only bind
+ports 80/443, write its own state and logs, and reach the internet and loopback.
+
+`systemd-analyze security duino-compile` (and `caddy`) scores the result.
