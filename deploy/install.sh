@@ -96,8 +96,11 @@ install -d -o caddy -g caddy /var/log/caddy
 install -D -m 0644 "$REPO_DIR/deploy/caddy-hardening.conf" /etc/systemd/system/caddy.service.d/hardening.conf
 systemctl daemon-reload
 sed "s/{\$DUINO_HOSTNAME}/$HOSTNAME_ARG/" "$REPO_DIR/deploy/Caddyfile" > /etc/caddy/Caddyfile
-caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile >/dev/null 2>&1 \
-  || caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
+# Validate as the caddy user: validating opens the log file, and doing it as
+# root would leave a root-owned log that the sandboxed service can't write.
+sudo -u caddy caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile >/dev/null 2>&1 \
+  || sudo -u caddy caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
+chown -R caddy:caddy /var/log/caddy
 
 if [ "${SKIP_PROXY:-}" = 1 ]; then
   systemctl disable --now caddy >/dev/null 2>&1 || true
