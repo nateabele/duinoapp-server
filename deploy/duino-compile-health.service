@@ -13,5 +13,7 @@ ExecStart=/bin/sh -c '\
     curl -fsS -m 10 -o /dev/null "http://127.0.0.1:$${PORT:-3030}/healthz" && exit 0; \
     sleep 5; \
   done; \
-  echo "duino-compile failed 3 health checks, restarting"; \
+  echo "duino-compile failed 3 health checks; requesting a diagnostic report, then restarting"; \
+  systemctl kill --kill-whom=main --signal=SIGUSR2 duino-compile; \
+  sleep 10; \
   systemctl restart duino-compile'

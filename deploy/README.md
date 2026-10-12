@@ -45,6 +45,29 @@ must already point at the instance.
 Health: `curl localhost:3030/healthz` shows running and queued compiles.
 Logs: `journalctl -u duino-compile -f`, `/var/log/caddy/duino-compile.log`.
 
+## Crashes, hangs and how to trace them
+
+The service restarts on any exit (no start limit), and `duino-compile-health.timer`
+restarts it if `/healthz` stops answering for about 30s.
+
+Each line in the journal is `event key=value ...`. To find out what took the server down:
+
+| What happened | Where to look |
+|---|---|
+| Which compiles were running | `compile.queued` / `compile.done` pairs share an `id`; a `queued` with no `done` was in flight |
+| JS crash | `process.uncaughtException` with stack and `inFlight`, plus a report in `/var/lib/duino-compile/reports/` |
+| Stopped by systemd / deploy | `process.signal` with `inFlight` |
+| Hang | `journalctl -u duino-compile-health`; the process gets SIGUSR2 first, which writes a report with JS and native stacks |
+| Node heap exhausted | a report in `reports/` (`--report-on-fatalerror`) |
+| Killed by memory cap / OOM | systemd's `oom-kill` / `status=9/KILL` lines; `cli.killed signal=SIGKILL` for a killed arduino-cli; `process.heartbeat` (every 5 min) shows the memory trend |
+| arduino-cli timeout | `cli.timeout` |
+
+```sh
+journalctl -u duino-compile -u duino-compile-health --since "-1h" --no-pager
+journalctl -u duino-compile | grep -E 'process\.|cli\.(killed|timeout)|oom'
+sudo ls -lt /var/lib/duino-compile/reports/
+```
+
 ## Sandbox (`deploy/duino-compile.service`)
 
 The server compiles untrusted code and downloads library zips from URLs the

@@ -14,7 +14,11 @@ Group=duino
 WorkingDirectory=/opt/duino-compile/app
 EnvironmentFile=/etc/duino-compile.env
 Environment=NODE_ENV=production DATA_DIR=/var/lib/duino-compile HOST=127.0.0.1 PORT=3030
-ExecStart=/opt/duino-compile/node/bin/node src/index.js
+# Diagnostic reports (JS + native stacks, handles, memory) go to reports/:
+# on a fatal V8 error such as heap exhaustion, and on SIGUSR2, which the
+# health check sends to a hung process before restarting it.
+ExecStartPre=/bin/mkdir -p /var/lib/duino-compile/reports
+ExecStart=/opt/duino-compile/node/bin/node --report-on-fatalerror --report-on-signal --report-signal=SIGUSR2 --report-directory=/var/lib/duino-compile/reports src/index.js
 Restart=always
 RestartSec=2
 

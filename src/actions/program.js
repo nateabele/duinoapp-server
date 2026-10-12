@@ -6,8 +6,26 @@ const tmpFiles = require('../utils/files');
 const json = require('../utils/json');
 const config = require('../config');
 const limit = require('../utils/limit');
+const log = require('../utils/log');
 
 const compileSlot = limit({ max: config.maxConcurrentCompiles, queueTimeout: config.compileQueueTimeout });
+
+// Compiles and uploads in progress, so a crash or shutdown can log what was running.
+const inFlight = new Map();
+let lastJobId = 0;
+const newJobId = () => { lastJobId += 1; return lastJobId; };
+
+// Request bodies come from clients; describe them without trusting their shape.
+const describe = (opts) => {
+  const o = opts && typeof opts === 'object' ? opts : {};
+  const files = Array.isArray(o.files) ? o.files : [];
+  return {
+    fqbn: typeof o.fqbn === 'string' ? o.fqbn : typeof o.fqbn,
+    files: files.length,
+    bytes: files.reduce((n, f) => n + (f && typeof f.content === 'string' ? f.content.length : 0), 0),
+    libs: Array.isArray(o.libs) ? o.libs.map((l) => l && l.name).join(',') : undefined,
+  };
+};
 
 
 const program = {
@@ -27,15 +45,39 @@ const program = {
 
   compileStats: () => compileSlot.stats(),
 
+  inFlight: () => [...inFlight.values()].map((job) => ({ ...job, ageMs: Date.now() - job.since })),
+
   // Never leave a caller hanging: any failure becomes an error response.
-  compile: async (opts, socket, done) => {
+  // `meta` ({ via, ip }) only labels the log lines.
+  compile: async (opts, socket, done, meta = {}) => {
+    const job = {
+      id: newJobId(), kind: 'compile', state: 'queued', since: Date.now(), ...meta, ...describe(opts),
+    };
+    inFlight.set(job.id, job);
+    log.info('compile.queued', {
+      ...job, kind: undefined, state: undefined, since: undefined, ...compileSlot.stats(),
+    });
     let response;
+    let started;
     try {
-      response = await compileSlot(() => program.compileUnsafe(opts, socket));
+      response = await compileSlot(() => {
+        started = Date.now();
+        job.state = 'running';
+        return program.compileUnsafe(opts, socket);
+      });
     } catch (err) {
-      console.error(err);
+      log.error('compile.failed', { id: job.id }, err);
       response = { error: { Cause: err.message, Message: err.message }, log: err.message };
     }
+    inFlight.delete(job.id);
+    const end = Date.now();
+    log.info('compile.done', {
+      id: job.id,
+      ok: !response.error && (!!response.hex || !!response.files),
+      waitMs: (started || end) - job.since,
+      runMs: started ? end - started : undefined,
+      error: response.error && response.error.Message && response.error.Message.slice(0, 200),
+    });
     if (done) done(response);
     return response;
   },
@@ -114,15 +156,20 @@ const program = {
     return response;
   },
 
-  upload: async ({ id = program.randId(), fqbn, flags = {} }, socket, done) => {
+  upload: async ({ id = program.randId(), fqbn, flags = {} }, socket, done, meta = {}) => {
     if (socket.uploading) return { Message: 'Already uploading, please hold.', Cause: 'Upload already initiated.' };
     socket.uploading = id;
     socket.emit('upload.id', id);
+    const job = {
+      id: newJobId(), kind: 'upload', uploadId: id, state: 'running', since: Date.now(), ...meta, fqbn,
+    };
+    inFlight.set(job.id, job);
+    log.info('upload.start', job);
     // await tmpFiles.loadTempFiles(files, socket);
 
     const sock = net.createServer((stream) => {
       // A reset connection emits 'error'; unhandled, it would crash the process.
-      stream.on('error', (err) => console.error(err));
+      stream.on('error', (err) => log.error('upload.stream.error', { id: job.id }, err));
       stream.on('data', (buff) => {
         socket.emit(`upload.dataDown.${id}`, buff);
       });
@@ -132,7 +179,7 @@ const program = {
 
       socket.on(`upload.dataUp.${id}`, (buff) => { if (!stream.destroyed) stream.write(buff); });
     });
-    sock.on('error', (err) => console.error(err));
+    sock.on('error', (err) => log.error('upload.proxy.error', { id: job.id }, err));
 
     // Port 0 lets the OS pick a free port; a random fixed port can collide with
     // another upload. Loopback only: arduino-cli is the only client.
@@ -141,6 +188,7 @@ const program = {
       sock.listen(0, '127.0.0.1', () => resolve(sock.address().port));
     }).catch((err) => {
       socket.uploading = null;
+      inFlight.delete(job.id);
       throw err;
     });
 
@@ -154,7 +202,11 @@ const program = {
 
     sock.close();
     socket.uploading = null;
+    inFlight.delete(job.id);
     const response = program.getError(res);
+    log.info('upload.done', {
+      id: job.id, ms: Date.now() - job.since, error: response.error && response.error.Message,
+    });
     // tmpFiles.cleanup(socket);
     if (done) done(response);
     return response;
