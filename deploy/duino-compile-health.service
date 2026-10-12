@@ -1,0 +1,17 @@
+# Restarts duino-compile when it is running but not answering (a hung event
+# loop never exits, so Restart=always can't catch it). Run by the .timer.
+[Unit]
+Description=duino-compile liveness check
+After=duino-compile.service
+
+[Service]
+Type=oneshot
+EnvironmentFile=-/etc/duino-compile.env
+ExecStart=/bin/sh -c '\
+  systemctl is-active --quiet duino-compile || exit 0; \
+  for try in 1 2 3; do \
+    curl -fsS -m 10 -o /dev/null "http://127.0.0.1:$${PORT:-3030}/healthz" && exit 0; \
+    sleep 5; \
+  done; \
+  echo "duino-compile failed 3 health checks, restarting"; \
+  systemctl restart duino-compile'

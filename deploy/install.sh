@@ -73,8 +73,11 @@ sudo -u duino env HOME="$DATA_DIR" DATA_DIR="$DATA_DIR" ${CORES:+CORES="$CORES"}
 
 log "systemd unit"
 install -m 0644 "$REPO_DIR/deploy/duino-compile.service" /etc/systemd/system/duino-compile.service
+install -m 0644 "$REPO_DIR/deploy/duino-compile-health.service" /etc/systemd/system/duino-compile-health.service
+install -m 0644 "$REPO_DIR/deploy/duino-compile-health.timer" /etc/systemd/system/duino-compile-health.timer
 systemctl daemon-reload
 systemctl enable duino-compile >/dev/null
+systemctl enable --now duino-compile-health.timer >/dev/null
 systemctl restart duino-compile
 PORT="$(sed -n 's/^PORT=//p' "$ENV_FILE" | tail -1)"; PORT="${PORT:-3030}"
 for _ in $(seq 1 30); do curl -fs "http://127.0.0.1:$PORT/healthz" >/dev/null && break; sleep 1; done

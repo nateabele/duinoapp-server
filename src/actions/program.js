@@ -121,6 +121,8 @@ const program = {
     // await tmpFiles.loadTempFiles(files, socket);
 
     const sock = net.createServer((stream) => {
+      // A reset connection emits 'error'; unhandled, it would crash the process.
+      stream.on('error', (err) => console.error(err));
       stream.on('data', (buff) => {
         socket.emit(`upload.dataDown.${id}`, buff);
       });
@@ -128,11 +130,19 @@ const program = {
         sock.close();
       });
 
-      socket.on(`upload.dataUp.${id}`, (buff) => stream.write(buff));
+      socket.on(`upload.dataUp.${id}`, (buff) => { if (!stream.destroyed) stream.write(buff); });
     });
+    sock.on('error', (err) => console.error(err));
 
-    const port = 4000 + Math.floor(Math.random() * 1000);
-    sock.listen(port);
+    // Port 0 lets the OS pick a free port; a random fixed port can collide with
+    // another upload. Loopback only: arduino-cli is the only client.
+    const port = await new Promise((resolve, reject) => {
+      sock.once('error', reject);
+      sock.listen(0, '127.0.0.1', () => resolve(sock.address().port));
+    }).catch((err) => {
+      socket.uploading = null;
+      throw err;
+    });
 
     const res = await cli('upload', [
       '-p', `net:localhost:${port}`,

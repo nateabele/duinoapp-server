@@ -10,6 +10,15 @@ const program = require('./actions/program');
 const { libPath } = require('./utils/files');
 const downloadFile = require('./utils/download-file');
 
+// A rejected promise nobody awaited belongs to one request; log it rather than
+// taking down every compile in flight. A synchronous uncaught exception may
+// leave state broken, so exit and let systemd restart a clean process.
+process.on('unhandledRejection', (err) => console.error('Unhandled rejection:', err));
+process.on('uncaughtException', (err) => {
+  console.error('Uncaught exception, exiting:', err);
+  process.exit(1);
+});
+
 const app = express();
 const server = http.Server(app);
 const io = socketio(server);
@@ -32,20 +41,29 @@ const safe = (fn) => (...args) => {
       if (typeof done === 'function') done({ error: { Cause: err.message, Message: err.message } });
     });
 };
+// Socket.io passes whatever the client sent, so the ack slot (last parameter)
+// may be missing or not a function. Calling a non-function ack from an async
+// handler is an unhandled rejection, which kills the process.
+const ack = (fn) => (...args) => {
+  const params = args.slice(0, fn.length);
+  const last = fn.length - 1;
+  if (typeof params[last] !== 'function') params[last] = () => {};
+  return safe(fn)(...params);
+};
 const send = (res) => (data) => {
   if (res.headersSent) return;
   res.status(data && data.error ? 500 : 200).json(data);
 };
 
 io.on('connection', async (socket) => {
-  socket.on('info.server', safe((done) => info.server(socket, done)));
-  socket.on('info.cores', safe((done) => info.cores(socket, done)));
-  socket.on('info.libraries', safe((done) => info.libraries(socket, done)));
-  socket.on('info.librariesSearch', safe((data, done) => info.librariesSearch(data, socket, done)));
-  socket.on('info.boards', safe((done) => info.boards(socket, done)));
+  socket.on('info.server', ack((done) => info.server(socket, done)));
+  socket.on('info.cores', ack((done) => info.cores(socket, done)));
+  socket.on('info.libraries', ack((done) => info.libraries(socket, done)));
+  socket.on('info.librariesSearch', ack((data, done) => info.librariesSearch(data, socket, done)));
+  socket.on('info.boards', ack((done) => info.boards(socket, done)));
 
-  socket.on('compile.start', (data, done) => program.compile(data, socket, done));
-  socket.on('upload.start', safe((data, done) => program.upload(data, socket, done)));
+  socket.on('compile.start', ack((data, done) => program.compile(data, socket, done)));
+  socket.on('upload.start', ack((data, done) => program.upload(data, socket, done)));
 
   socket.on('disconnect', () => socket.tmpDir && socket.tmpDir.cleanup());
 
@@ -53,7 +71,7 @@ io.on('connection', async (socket) => {
 });
 
 io.of('/ping').on('connect', (socket) => {
-  socket.on('p', safe((done) => info.server(socket, done)));
+  socket.on('p', ack((done) => info.server(socket, done)));
 });
 
 app.set('trust proxy', 1); // trust first proxy

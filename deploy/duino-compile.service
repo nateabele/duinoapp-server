@@ -4,6 +4,8 @@
 Description=duino.app Arduino compile server
 After=network-online.target
 Wants=network-online.target
+# Keep restarting after repeated crashes; the default gives up after 5 in 10s.
+StartLimitIntervalSec=0
 
 [Service]
 Type=simple

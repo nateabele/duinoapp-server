@@ -15,7 +15,7 @@ const files = {
   checkPath: (filepath, socket, sub = '') => {
     if (filepath.indexOf(path.join(socket.tmpDir.path, sub)) !== 0) {
       const msg = `Security error, path "${filepath}" went out of bounds.`;
-      socket.emit('console.error', msg);
+      if (socket.emit) socket.emit('console.error', msg);
       throw new Error(msg);
     }
   },
