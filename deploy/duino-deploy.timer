@@ -1,0 +1,10 @@
+[Unit]
+Description=Check for compile server updates every 5 minutes
+
+[Timer]
+OnBootSec=5min
+# Counted from the end of the previous run, so a long install never overlaps the next check.
+OnUnitInactiveSec=5min
+
+[Install]
+WantedBy=timers.target

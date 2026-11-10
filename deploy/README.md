@@ -29,12 +29,37 @@ On Apple Silicon the AVR toolchain is an x86-64 build and runs under Rosetta.
 ## Production (Ubuntu on EC2)
 
 ```sh
-git clone -b native-server https://github.com/nateabele/duinoapp-server.git
-cd duinoapp-server
-sudo deploy/install.sh compiler.example.com
+sudo git clone -b production https://github.com/nateabele/duinoapp-server.git /opt/duino-compile/src
+sudo /opt/duino-compile/src/deploy/install.sh compiler.example.com
 sudoedit /etc/duino-compile.env   # server name/owner shown by /v3/info/server
 sudo systemctl restart duino-compile
 ```
+
+Clone as root into `/opt/duino-compile/src`: install.sh only turns on auto-deploy
+for a root-owned git checkout.
+
+## Updates (CI/CD)
+
+1. Push to `native-server`. GitHub Actions (`.github/workflows/promote.yml`) runs
+   the unit tests, the auto-deploy tests and a start-up check, then fast-forwards
+   `production` to that commit.
+2. On the server, `duino-deploy.timer` runs `deploy/auto-deploy.sh` every 5 minutes.
+   When `production` has moved, it waits until no compiles are running (at most
+   30 minutes), checks out the new commit and runs `install.sh`. If the install
+   fails or `/healthz` doesn't come back, it reinstalls the previous commit and
+   skips the failed one until a newer commit lands.
+
+A full install takes about 6 minutes; the service restarts only near the end.
+
+```sh
+journalctl -u duino-deploy -f                  # deploy runs, rollbacks
+cat /var/lib/duino-deploy/deployed             # commit that's live
+sudo systemctl start duino-deploy              # check for an update now
+```
+
+`/etc/duino-compile.env` (server settings) and `/etc/duino-deploy.env` (deploy
+settings: `DEPLOY_REPO`, `DEPLOY_BRANCH`, `DEPLOY_HOSTNAME`, `DEPLOY_MAX_WAIT`)
+live only on the server; deploys never overwrite them.
 
 The script installs Node to `/opt/duino-compile/node`, the code (root-owned,
 read-only to the service) to `/opt/duino-compile/app`, data to

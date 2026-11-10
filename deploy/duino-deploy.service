@@ -1,0 +1,13 @@
+# Deploys new commits from the production branch (see deploy/auto-deploy.sh).
+# Run by duino-deploy.timer. Logs: journalctl -u duino-deploy
+[Unit]
+Description=duino-compile auto-deploy from git
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+# install.sh needs apt, systemctl and writes /opt, so this runs unsandboxed as root.
+ExecStart=/usr/local/sbin/duino-auto-deploy
+# A full install re-runs setup (about 6 minutes); a rollback doubles that.
+TimeoutStartSec=40min

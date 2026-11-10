@@ -83,6 +83,23 @@ PORT="$(sed -n 's/^PORT=//p' "$ENV_FILE" | tail -1)"; PORT="${PORT:-3030}"
 for _ in $(seq 1 30); do curl -fs "http://127.0.0.1:$PORT/healthz" >/dev/null && break; sleep 1; done
 curl -fsS "http://127.0.0.1:$PORT/healthz" && echo
 
+log "Auto-deploy timer (deploy/auto-deploy.sh)"
+install -m 0755 "$REPO_DIR/deploy/auto-deploy.sh" /usr/local/sbin/duino-auto-deploy
+install -m 0644 "$REPO_DIR/deploy/duino-deploy.service" /etc/systemd/system/duino-deploy.service
+install -m 0644 "$REPO_DIR/deploy/duino-deploy.timer" /etc/systemd/system/duino-deploy.timer
+systemctl daemon-reload
+# Only a root-owned git checkout can deploy itself (git refuses other owners' repos as root).
+if commit="$(git -C "$REPO_DIR" rev-parse HEAD 2>/dev/null)"; then
+  [ -f /etc/duino-deploy.env ] || printf 'DEPLOY_REPO=%s\nDEPLOY_BRANCH=production\nDEPLOY_HOSTNAME=%s\n' \
+    "$REPO_DIR" "$HOSTNAME_ARG" > /etc/duino-deploy.env
+  install -d /var/lib/duino-deploy
+  echo "$commit" > /var/lib/duino-deploy/deployed
+  systemctl enable --now duino-deploy.timer >/dev/null
+  echo "following $(sed -n 's/^DEPLOY_BRANCH=//p' /etc/duino-deploy.env) from $(sed -n 's/^DEPLOY_REPO=//p' /etc/duino-deploy.env)"
+else
+  echo "$REPO_DIR is not a root-owned git checkout; auto-deploy timer left off"
+fi
+
 log "Caddy $CADDY_VERSION (TLS for $HOSTNAME_ARG)"
 if ! dpkg -s caddy 2>/dev/null | grep -q "^Version: $CADDY_VERSION"; then
   curl -fsSL https://dl.cloudsmith.io/public/caddy/stable/gpg.key | gpg --dearmor --yes -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg

@@ -1,0 +1,51 @@
+# Tests every push to native-server; if they pass, fast-forwards `production`
+# to that commit. The compile server's duino-deploy.timer follows `production`
+# and deploys it within about 5 minutes (deploy/auto-deploy.sh).
+name: Test and promote
+
+on:
+  push:
+    branches: [native-server]
+  pull_request:
+    branches: [native-server]
+
+concurrency:
+  group: promote
+  cancel-in-progress: false
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - run: npm test
+      - name: Auto-deploy script
+        run: |
+          shellcheck deploy/auto-deploy.sh deploy/install.sh test/auto-deploy.sh
+          test/auto-deploy.sh
+      - name: Server starts and answers /healthz
+        run: |
+          PORT=3131 node src/index.js > server.log 2>&1 &
+          for _ in $(seq 1 30); do curl -fsS localhost:3131/healthz && exit 0; sleep 1; done
+          cat server.log; exit 1
+
+  promote:
+    needs: test
+    if: github.event_name == 'push'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Fast-forward production
+        # A non-fast-forward push fails, so production never loses commits.
+        run: |
+          git push origin "$GITHUB_SHA:refs/heads/production"
+          echo "production -> ${GITHUB_SHA::7}"
