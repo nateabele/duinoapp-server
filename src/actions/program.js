@@ -8,7 +8,10 @@ const config = require('../config');
 const limit = require('../utils/limit');
 const log = require('../utils/log');
 
-const compileSlot = limit({ max: config.maxConcurrentCompiles, queueTimeout: config.compileQueueTimeout });
+const compileSlot = limit({
+  max: config.maxConcurrentCompiles,
+  queueTimeout: config.compileQueueTimeout,
+});
 
 // Compiles and uploads in progress, so a crash or shutdown can log what was running.
 const inFlight = new Map();

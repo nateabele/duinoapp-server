@@ -83,6 +83,8 @@ const files = {
         // Rename versioned folder to library name (e.g., TM1637-1.2.0 -> TM1637)
         // Arduino CLI expects folder names without version suffixes
         const entries = await fs.readdir(libPath);
+        // Sequential on purpose: each rename checks whether its target exists first.
+        // eslint-disable-next-line no-restricted-syntax
         for (const entry of entries) {
           // Check if folder matches pattern: LibName-version (e.g., TM1637-1.2.0)
           const versionMatch = entry.match(/^(.+)-\d+\.\d+\.\d+$/);
@@ -92,8 +94,10 @@ const files = {
             const newPath = path.join(libPath, baseName);
             // Only rename if target doesn't exist
             try {
+              // eslint-disable-next-line no-await-in-loop
               await fs.access(newPath);
             } catch {
+              // eslint-disable-next-line no-await-in-loop
               await fs.rename(oldPath, newPath);
             }
           }

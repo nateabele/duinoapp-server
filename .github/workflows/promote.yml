@@ -24,6 +24,7 @@ jobs:
           cache: npm
       - run: npm ci --no-audit --no-fund
       - run: npm test
+      - run: npx eslint src
       - name: Auto-deploy script
         run: |
           shellcheck deploy/auto-deploy.sh deploy/install.sh test/auto-deploy.sh

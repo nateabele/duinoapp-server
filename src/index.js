@@ -1,9 +1,9 @@
-const config = require('./config');
 const http = require('http');
 const socketio = require('socket.io');
 const express = require('express');
 const helmet = require('helmet');
 const cors = require('cors');
+const config = require('./config');
 
 const info = require('./actions/info');
 const program = require('./actions/program');
