@@ -34,6 +34,10 @@ module.exports = {
   // Kill a single arduino-cli invocation that runs longer than this.
   cliTimeout: Number(process.env.CLI_TIMEOUT_MS) || 120 * 1000,
 
+  // The socket.io `upload.start` event proxies arduino-cli uploads over a socket
+  // and has no authentication, so it is off unless explicitly enabled.
+  uploadProxyEnabled: ['1', 'true'].includes(String(process.env.UPLOAD_PROXY_ENABLED).toLowerCase()),
+
   // Library zips may only be fetched from these hosts.
   libAllowedHosts: list(
     process.env.LIB_ALLOWED_HOSTS,

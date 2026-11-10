@@ -8,6 +8,10 @@ The main purpose of this is to let arduino-cli handle most of the code compiling
 The main update made in 3.0 is the websocket interface, which gives real-time communication with
 the client, allowing us to proxy the serial connection to the device for uploading.
 
+The upload proxy (`upload.start`) has no authentication, so it is **disabled by default**. Set
+`UPLOAD_PROXY_ENABLED=1` to turn it back on; otherwise the event answers with an error and never
+runs arduino-cli. Compiling (`POST /v3/compile`) is unaffected.
+
 It's important to note that this server is bundled using docker with **All** the libraries installed,
 this allows anyone to use any library they desire by simply including it. The down side of this is
 that the servers docker-bundle size is several gigabytes in size.
