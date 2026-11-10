@@ -156,7 +156,19 @@ const program = {
     return response;
   },
 
-  upload: async ({ id = program.randId(), fqbn, flags = {} }, socket, done, meta = {}) => {
+  upload: async (opts, socket, done, meta = {}) => {
+    if (!config.uploadProxyEnabled) {
+      log.info('upload.disabled', meta);
+      const response = {
+        error: {
+          Message: 'Upload proxy is disabled on this server.',
+          Cause: 'Set UPLOAD_PROXY_ENABLED=1 to enable it.',
+        },
+      };
+      if (typeof done === 'function') done(response);
+      return response;
+    }
+    const { id = program.randId(), fqbn, flags = {} } = opts;
     if (socket.uploading) return { Message: 'Already uploading, please hold.', Cause: 'Upload already initiated.' };
     socket.uploading = id;
     socket.emit('upload.id', id);
