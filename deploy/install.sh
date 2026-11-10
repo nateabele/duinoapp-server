@@ -7,8 +7,15 @@
 # Re-running is safe: it re-syncs the code, re-runs `npm ci` and setup
 # (already-installed pinned cores are skipped) and restarts the service.
 #
+# The slow part of setup (index download + board/library pre-processing: ~6 min,
+# ~3 GB peak memory) is skipped when setup/versions.json, the setup code and
+# CORES are unchanged since the last successful run and the data is under
+# SETUP_MAX_AGE_DAYS (default 7) old. The stamp lives in $DATA_DIR/setup-stamp.json.
+#
 # Env options:
 #   CORES=arduino:avr   install only these cores (default: all pinned in setup/versions.json)
+#   FORCE_SETUP=1       always redo the index/board processing
+#   SETUP_MAX_AGE_DAYS=N  refresh the indexes when the last run is N+ days old (default 7; 0 = every run)
 #   SKIP_PROXY=1        install Caddy but leave it stopped (e.g. while another proxy holds 80/443)
 set -euo pipefail
 export DEBIAN_FRONTEND=noninteractive
@@ -69,6 +76,7 @@ log "Config $ENV_FILE"
 
 log "arduino-cli, indexes and pinned cores -> $DATA_DIR (as duino)"
 sudo -u duino env HOME="$DATA_DIR" DATA_DIR="$DATA_DIR" ${CORES:+CORES="$CORES"} \
+  ${FORCE_SETUP:+FORCE_SETUP="$FORCE_SETUP"} ${SETUP_MAX_AGE_DAYS:+SETUP_MAX_AGE_DAYS="$SETUP_MAX_AGE_DAYS"} \
   "$PREFIX/node/bin/node" "$PREFIX/app/setup/install.js"
 
 log "systemd unit"

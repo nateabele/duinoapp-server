@@ -49,7 +49,22 @@ for a root-owned git checkout.
    fails or `/healthz` doesn't come back, it reinstalls the previous commit and
    skips the failed one until a newer commit lands.
 
-A full install takes about 6 minutes; the service restarts only near the end.
+A full install takes about 6 minutes (and a ~3 GB memory peak) because setup
+re-downloads and pre-processes the board and library indexes. Most deploys skip
+that: `setup/install.js` records a stamp (`setup-stamp.json` in the data dir, a
+hash of `setup/versions.json`, the setup code, `package-lock.json` and the
+`CORES` selection, plus a timestamp) after a successful run and skips the index
+work when the stamp matches, the processed files exist and the data is under 7
+days old. Such a deploy takes about a minute, mostly `npm ci`. The arduino-cli
+checksum check and pinned core installs always run. A rollback to a commit whose
+setup inputs differ pays the full cost again.
+
+```sh
+sudo FORCE_SETUP=1 /opt/duino-compile/src/deploy/install.sh compiler.example.com   # always redo it
+sudo SETUP_MAX_AGE_DAYS=1 ...    # refresh window in days (default 7; 0 = every deploy)
+```
+
+The service restarts only near the end.
 
 ```sh
 journalctl -u duino-deploy -f                  # deploy runs, rollbacks
